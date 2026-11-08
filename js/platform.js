@@ -17,11 +17,17 @@ export const platform = Capacitor.getPlatform(); // 'web' | 'ios' | 'android'
 // capacitor.config.json); the resulting credential signs in the Firebase JS SDK,
 // so the rest of the app (Firestore, auth state) is unchanged.
 
+// IMPORTANT: never resolve a Promise with a Capacitor plugin object (no
+// `.then(m => m.Plugin)`, no `return plugin` from an async function). A Promise
+// checks the value for a `then` method; the plugin proxy answers every property
+// with a native method, so `then` becomes a native call that never replies and
+// the Promise hangs forever. The loaders below resolve to the *module*, and the
+// plugin is read from it only after the await.
+
 let _authPlugin = null;
-function authPlugin() {
+function authModule() {
     if (!_authPlugin) {
         _authPlugin = import('@capacitor-firebase/authentication')
-            .then((m) => m.FirebaseAuthentication)
             .catch((err) => { _authPlugin = null; throw err; });
     }
     return _authPlugin;
@@ -29,14 +35,14 @@ function authPlugin() {
 
 /** Native Google sign-in → { idToken, accessToken } */
 export async function nativeGoogleSignIn() {
-    const plugin = await authPlugin();
+    const plugin = (await authModule()).FirebaseAuthentication;
     const result = await plugin.signInWithGoogle({ skipNativeAuth: true });
     return result.credential || {};
 }
 
 /** Native Sign in with Apple → { idToken, nonce, authorizationCode } */
 export async function nativeAppleSignIn() {
-    const plugin = await authPlugin();
+    const plugin = (await authModule()).FirebaseAuthentication;
     const result = await plugin.signInWithApple({ skipNativeAuth: true });
     return result.credential || {};
 }
@@ -45,7 +51,7 @@ export async function nativeAppleSignIn() {
 export async function nativeSignOut() {
     if (!isNative) return;
     try {
-        const plugin = await authPlugin();
+        const plugin = (await authModule()).FirebaseAuthentication;
         await plugin.signOut();
     } catch (err) {
         console.warn('[platform] native sign-out failed:', err.message);
@@ -55,10 +61,9 @@ export async function nativeSignOut() {
 // ---- Native push (FCM via the Firebase iOS/Android SDKs) ----
 
 let _messagingPlugin = null;
-export function messagingPlugin() {
+function messagingModule() {
     if (!_messagingPlugin) {
         _messagingPlugin = import('@capacitor-firebase/messaging')
-            .then((m) => m.FirebaseMessaging)
             .catch((err) => { _messagingPlugin = null; throw err; });
     }
     return _messagingPlugin;
@@ -83,7 +88,7 @@ export function notificationPermission() {
 export async function refreshNotificationPermission() {
     if (!isNative) return notificationPermission();
     try {
-        const plugin = await messagingPlugin();
+        const plugin = (await messagingModule()).FirebaseMessaging;
         const { receive } = await plugin.checkPermissions();
         nativePermission = mapNativePermission(receive);
     } catch (err) {
@@ -94,7 +99,7 @@ export async function refreshNotificationPermission() {
 
 export async function requestNotificationPermission() {
     if (!isNative) return Notification.requestPermission();
-    const plugin = await messagingPlugin();
+    const plugin = (await messagingModule()).FirebaseMessaging;
     const { receive } = await plugin.requestPermissions();
     nativePermission = mapNativePermission(receive);
     return nativePermission;
@@ -102,7 +107,7 @@ export async function requestNotificationPermission() {
 
 /** The FCM registration token for this device (native SDK). */
 export async function nativePushToken() {
-    const plugin = await messagingPlugin();
+    const plugin = (await messagingModule()).FirebaseMessaging;
     const { token } = await plugin.getToken();
     return token || null;
 }
@@ -115,7 +120,7 @@ export async function nativePushToken() {
  */
 export async function initNativePush({ onToken, onForegroundMessage }) {
     if (!isNative) return;
-    const plugin = await messagingPlugin();
+    const plugin = (await messagingModule()).FirebaseMessaging;
 
     if (platform === 'android') {
         const channels = [

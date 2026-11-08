@@ -61,3 +61,11 @@ const profile = profiles.data[0];
 console.log(`${ok(profile)} Profile "${PROFILE_NAME}": ${profile
     ? `${profile.attributes.profileType}, ${profile.attributes.profileState}, expires ${profile.attributes.expirationDate.slice(0, 10)}`
     : 'not created yet'}`);
+
+if (app) {
+    const builds = await api(`/v1/builds?filter[app]=${app.id}&sort=-uploadedDate&limit=5&fields[builds]=version,processingState,uploadedDate,expired`);
+    console.log(`Builds (newest first): ${builds.data.length ? '' : 'none yet'}`);
+    for (const b of builds.data) {
+        console.log(`  build ${b.attributes.version}: ${b.attributes.processingState}, uploaded ${new Date(b.attributes.uploadedDate).toISOString().slice(0, 16).replace('T', ' ')} UTC`);
+    }
+}
