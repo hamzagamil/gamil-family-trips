@@ -87,10 +87,12 @@ jobs:
       - name: Verify push and Sign in with Apple entitlements
         run: |
           APP="$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app"
-          codesign -d --entitlements :- "$APP" > "$RUNNER_TEMP/entitlements.plist"
-          plutil -extract aps-environment raw "$RUNNER_TEMP/entitlements.plist" | grep -qx production \
+          ENT="$RUNNER_TEMP/entitlements.plist"
+          codesign -d --entitlements - --xml "$APP" > "$ENT"
+          # PlistBuddy, not plutil: plutil reads the dots in these keys as a key path
+          /usr/libexec/PlistBuddy -c "Print :aps-environment" "$ENT" | grep -qx production \
             || { echo "::error::aps-environment is not production"; exit 1; }
-          plutil -extract com.apple.developer.applesignin raw "$RUNNER_TEMP/entitlements.plist" > /dev/null \
+          /usr/libexec/PlistBuddy -c "Print :com.apple.developer.applesignin" "$ENT" | grep -q Default \
             || { echo "::error::Sign in with Apple entitlement missing"; exit 1; }
           test -f "$APP/GoogleService-Info.plist" || { echo "::error::GoogleService-Info.plist not bundled"; exit 1; }
           echo "Entitlements and Firebase config OK"
