@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Gamil Family Trips</title>
+    <meta name="description"
+        content="Collaborate on daily trips with your team. Create, join, and manage shared rides effortlessly.">
+
+    <!-- PWA / Mobile Meta Tags -->
+    <meta name="theme-color" content="#0a0e1a">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Gamil Family Trips">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+
+    <!-- Returning user? Show the app shell instead of the sign-in screen while
+         Firebase restores the session. The hint is written by js/auth.js. -->
+    <script>
+        try { if (localStorage.getItem('tripsync:session')) document.documentElement.classList.add('has-session'); } catch (e) {}
+    </script>
+
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%236366f1'/%3E%3Cstop offset='100%25' stop-color='%2306b6d4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Ctext x='32' y='44' font-size='36' text-anchor='middle' fill='white' font-family='sans-serif'%3E🚗%3C/text%3E%3C/svg%3E">
+
+    <!-- Google Fonts — non-blocking, falls back to system fonts until ready.
+         Inter: one variable file covering the 400–700 weights the CSS uses.
+         Icons: Material Symbols subset with only the icons the app uses
+         (~6 KB instead of ~170 KB). When you use a NEW icon name, add it to
+         icon_names in both URLs below (keep the list alphabetical) or it will
+         render as plain text. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" as="style"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&amp;display=swap"
+        onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" as="style"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0&amp;icon_names=add,add_circle,airline_seat_recline_normal,bolt,calendar_today,check_circle,chevron_left,chevron_right,close,delete,directions_car,drive_eta,edit,error,expand_more,group,info,install_mobile,label,list_alt,logout,manage_accounts,no_crash,notifications,notifications_active,person,person_add,person_off,person_pin_circle,person_remove,place,route,schedule,settings,star,task_alt&amp;display=block"
+        onload="this.onload=null;this.rel='stylesheet'">
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&amp;display=swap">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0&amp;icon_names=add,add_circle,airline_seat_recline_normal,bolt,calendar_today,check_circle,chevron_left,chevron_right,close,delete,directions_car,drive_eta,edit,error,expand_more,group,info,install_mobile,label,list_alt,logout,manage_accounts,no_crash,notifications,notifications_active,person,person_add,person_off,person_pin_circle,person_remove,place,route,schedule,settings,star,task_alt&amp;display=block">
+    </noscript>
+
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+
+<body>
+    <!-- ============ AUTH SCREEN ============ -->
+    <div id="auth-screen" class="screen active">
+        <div class="auth-container">
+            <div class="auth-glow"></div>
+            <div class="auth-card">
+                <div class="auth-logo">
+                    <span class="material-icons-round logo-icon">directions_car</span>
+                </div>
+                <h1 class="auth-title">Gamil Family Trips</h1>
+                <p class="auth-subtitle">Coordinate daily trips with your team.<br>Create, join & never miss a ride.</p>
+                <button id="btn-google-signin" class="btn-google">
+                    <svg class="google-icon" viewBox="0 0 24 24" width="20" height="20">
+                        <path fill="#4285F4"
+                            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
+                        <path fill="#34A853"
+                            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                        <path fill="#FBBC05"
+                            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                        <path fill="#EA4335"
+                            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                    </svg>
+                    <span>Sign in with Google</span>
+                </button>
+                <!-- Shown only in the iOS app (App Store guideline 4.8) -->
+                <button id="btn-apple-signin" class="btn-google btn-apple hidden">
+                    <svg class="google-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                        <path fill="currentColor"
+                            d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.15.572-2.27 1.206-2.98.804-.94 2.142-1.64 3.248-1.68.03.13.05.28.05.43zm4.565 15.71c-.03.07-.463 1.58-1.518 3.12-.945 1.34-1.94 2.71-3.43 2.71-1.517 0-1.9-.88-3.63-.88-1.698 0-2.302.91-3.67.91-1.377 0-2.332-1.26-3.428-2.8-1.287-1.82-2.323-4.63-2.323-7.28 0-4.28 2.797-6.55 5.552-6.55 1.448 0 2.675.95 3.6.95.865 0 2.222-1.01 3.902-1.01.613 0 2.886.06 4.374 2.19-.13.09-2.383 1.37-2.383 4.19 0 3.26 2.854 4.42 2.955 4.45z" />
+                    </svg>
+                    <span>Sign in with Apple</span>
+                </button>
+                <p class="auth-legal">
+                    By continuing you agree to our
+                    <a href="https://daily-trip-planner.web.app/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ MAIN APP ============ -->
+    <div id="app-screen" class="screen">
+        <!-- Top Nav -->
+        <nav id="top-nav">
+            <div class="nav-left">
+                <span class="material-icons-round nav-logo-icon">directions_car</span>
+                <span class="nav-brand">Gamil Family Trips</span>
+            </div>
+            <div class="nav-center">
+                <button class="nav-tab active" data-view="all-trips">
+                    <span class="material-icons-round">list_alt</span>
+                    <span class="tab-label">All Trips</span>
+                </button>
+                <button class="nav-tab" data-view="my-trips">
+                    <span class="material-icons-round">person_pin_circle</span>
+                    <span class="tab-label">My Trips</span>
+                </button>
+                <button class="nav-tab" data-view="open-driving">
+                    <span class="material-icons-round">drive_eta</span>
+                    <span class="tab-label">Open Driving</span>
+                </button>
+            </div>
+            <div class="nav-right">
+                <div id="notification-bell" class="nav-icon-btn" title="Notifications">
+                    <span class="material-icons-round">notifications</span>
+                    <span id="notif-badge" class="badge hidden">0</span>
+                </div>
+                <div id="user-avatar" class="avatar" title="Account">
+                    <img id="user-photo" src="" alt="User">
+                </div>
+            </div>
+        </nav>
+
+        <!-- ============ PROFILE SHEET ============ -->
+        <div id="profile-sheet-overlay" class="profile-sheet-overlay hidden">
+            <div id="profile-sheet" class="profile-sheet">
+                <!-- Drag handle (mobile) -->
+                <div class="profile-sheet-handle"></div>
+
+                <!-- Close button -->
+                <button id="profile-sheet-close" class="profile-sheet-close">
+                    <span class="material-icons-round">close</span>
+                </button>
+
+                <!-- Hero: photo + name + email -->
+                <div class="profile-hero">
+                    <div class="profile-avatar-ring">
+                        <img id="profile-sheet-photo" src="" alt="Profile Photo" class="profile-big-photo">
+                    </div>
+                    <h2 id="profile-sheet-name" class="profile-sheet-name"></h2>
+                    <p id="profile-sheet-email" class="profile-sheet-email"></p>
+                    <div id="profile-sheet-role-badge" class="profile-role-chip hidden">
+                        <span class="material-icons-round" id="profile-role-chip-icon">person</span>
+                        <span id="profile-role-chip-label">Rider</span>
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <div class="profile-divider"></div>
+
+                <!-- Account Type Toggle -->
+                <div class="profile-section">
+                    <p class="profile-section-title">
+                        <span class="material-icons-round">manage_accounts</span>
+                        Account Type
+                    </p>
+                    <div class="profile-role-toggle">
+                        <button class="profile-role-card" id="ps-btn-driver" data-role="driver">
+                            <div class="profile-role-card-icon driver-icon">
+                                <span class="material-icons-round">drive_eta</span>
+                            </div>
+                            <span class="profile-role-card-label">Driver</span>
+                            <span class="profile-role-card-desc">I drive others</span>
+                            <span class="material-icons-round profile-role-check">check_circle</span>
+                        </button>
+                        <button class="profile-role-card" id="ps-btn-rider" data-role="rider">
+                            <div class="profile-role-card-icon rider-icon">
+                                <span class="material-icons-round">airline_seat_recline_normal</span>
+                            </div>
+                            <span class="profile-role-card-label">Rider</span>
+                            <span class="profile-role-card-desc">I join as passenger</span>
+                            <span class="material-icons-round profile-role-check">check_circle</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <div class="profile-divider"></div>
+
+                <!-- Settings -->
+                <div class="profile-section">
+                    <p class="profile-section-title">
+                        <span class="material-icons-round">settings</span>
+                        Settings
+                    </p>
+                    <button id="btn-enable-notif" class="profile-action-item">
+                        <div class="profile-action-icon notif-icon">
+                            <span class="material-icons-round">notifications_active</span>
+                        </div>
+                        <div class="profile-action-text">
+                            <span class="profile-action-label">Push Notifications</span>
+                            <span id="notif-status-label" class="profile-action-sub">Tap to enable</span>
+                        </div>
+                        <span class="material-icons-round profile-action-chevron">chevron_right</span>
+                    </button>
+                    <button id="pwa-install-item" class="profile-action-item hidden">
+                        <div class="profile-action-icon install-icon">
+                            <span class="material-icons-round">install_mobile</span>
+                        </div>
+                        <div class="profile-action-text">
+                            <span class="profile-action-label">Install App</span>
+                            <span class="profile-action-sub">Add to home screen</span>
+                        </div>
+                        <span class="material-icons-round profile-action-chevron">chevron_right</span>
+                    </button>
+                </div>
+
+                <!-- Divider -->
+                <div class="profile-divider"></div>
+
+                <!-- Frequent Trips Management -->
+                <div class="profile-section" id="profile-frequent-section">
+                    <p class="profile-section-title">
+                        <span class="material-icons-round">bolt</span>
+                        My Frequent Trips
+                    </p>
+                    <div id="profile-frequent-list" class="profile-frequent-list">
+                        <!-- Frequent trip items rendered by JS -->
+                    </div>
+                    <button id="btn-add-frequent" class="btn-add-frequent">
+                        <span class="material-icons-round">add_circle</span>
+                        Add Frequent Trip
+                    </button>
+                    <div class="profile-frequent-footer">
+                        <span id="profile-frequent-count" class="profile-frequent-count">0/10 used</span>
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <div class="profile-divider"></div>
+
+                <!-- Sign Out -->
+                <button id="btn-signout" class="profile-signout-btn">
+                    <span class="material-icons-round">logout</span>
+                    Sign Out
+                </button>
+
+                <!-- Account deletion (App Store 5.1.1(v) / Google Play requirement) -->
+                <div class="profile-legal-links">
+                    <a href="https://daily-trip-planner.web.app/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
+                    <span aria-hidden="true">·</span>
+                    <button id="btn-delete-account" class="profile-delete-account">Delete account</button>
+                </div>
+
+                <!-- Hidden fields kept for JS backwards compat -->
+                <img id="menu-photo" src="" alt="" class="hidden">
+                <p id="menu-name" class="hidden"></p>
+                <p id="menu-email" class="hidden"></p>
+                <div id="menu-role-display" class="hidden">
+                    <span id="menu-role-icon"></span>
+                    <span id="menu-role-label"></span>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Date Bar -->
+        <div id="date-bar">
+            <button id="btn-prev-day" class="date-nav-btn" title="Previous Day">
+                <span class="material-icons-round">chevron_left</span>
+            </button>
+            <span class="material-icons-round date-bar-icon">calendar_today</span>
+            <input type="date" id="view-date-picker">
+            <span id="date-label" class="date-label"></span>
+            <span id="current-date" class="hidden"></span>
+            <button id="btn-next-day" class="date-nav-btn" title="Next Day">
+                <span class="material-icons-round">chevron_right</span>
+            </button>
+        </div>
+
+        <!-- ============ QUICK ADD SECTION ============ -->
+        <div id="quick-add-section" class="quick-add-section hidden">
+            <div class="quick-add-header">
+                <div class="quick-add-title">
+                    <span class="material-icons-round">bolt</span>
+                    Quick Add
+                </div>
+                <a href="#" id="quick-add-manage" class="quick-add-manage">Manage<span class="material-icons-round">chevron_right</span></a>
+            </div>
+            <div id="quick-add-cards" class="quick-add-cards">
+                <!-- Quick add cards rendered by JS -->
+            </div>
+        </div>
+
+        <!-- Views Container -->
+        <main id="views-container">
+            <!-- All Trips View -->
+            <section id="view-all-trips" class="view active">
+                <div id="trips-list" class="trips-grid">
+                    <!-- Trip cards rendered here; placeholders until the first snapshot -->
+                    <div class="trip-skeleton" aria-hidden="true"><div class="skeleton-line wide"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+                    <div class="trip-skeleton" aria-hidden="true"><div class="skeleton-line wide"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+                    <div class="trip-skeleton" aria-hidden="true"><div class="skeleton-line wide"></div><div class="skeleton-line"></div><div class="skeleton-line short"></div></div>
+                </div>
+                <div id="empty-trips" class="empty-state hidden">
+                    <span class="material-icons-round empty-icon">route</span>
+                    <h3>No trips yet today</h3>
+                    <p>Be the first to create a trip!</p>
+                </div>
+            </section>
+
+            <!-- My Trips View -->
+            <section id="view-my-trips" class="view">
+                <div id="my-trips-list" class="trips-grid">
+                    <!-- My trip cards rendered here -->
+                </div>
+                <div id="empty-my-trips" class="empty-state hidden">
+                    <span class="material-icons-round empty-icon">person_off</span>
+                    <h3>No assigned trips</h3>
+                    <p>Join a trip from the "All Trips" view.</p>
+                </div>
+            </section>
+
+            <!-- Open Driving View -->
+            <section id="view-open-driving" class="view">
+                <div id="open-driving-list" class="trips-grid">
+                    <!-- Open driving trips rendered here -->
+                </div>
+                <div id="empty-open-driving" class="empty-state hidden">
+                    <span class="material-icons-round empty-icon">no_crash</span>
+                    <h3>All trips have drivers</h3>
+                    <p>Check back later for new opportunities.</p>
+                </div>
+            </section>
+        </main>
+
+        <!-- FAB (Floating Action Button) -->
+        <button id="fab-create" class="fab" title="Create Trip">
+            <span class="material-icons-round">add</span>
+        </button>
+
+        <!-- ============ CREATE TRIP MODAL ============ -->
+        <div id="modal-overlay" class="modal-overlay hidden">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h2>Create a Trip</h2>
+                    <button id="btn-close-modal" class="modal-close">
+                        <span class="material-icons-round">close</span>
+                    </button>
+                </div>
+                <form id="form-create-trip" class="modal-body" autocomplete="off">
+                    <div class="form-group">
+                        <label for="input-destination">
+                            <span class="material-icons-round">place</span>
+                            Destination
+                        </label>
+                        <div class="autocomplete-wrapper">
+                            <input type="text" id="input-destination" placeholder="Search or add a destination..."
+                                required>
+                            <ul id="destination-suggestions" class="suggestions-list hidden"></ul>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="input-date">
+                            <span class="material-icons-round">calendar_today</span>
+                            Departure Date
+                        </label>
+                        <input type="date" id="input-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="input-time">
+                            <span class="material-icons-round">schedule</span>
+                            Departure Time
+                        </label>
+                        <input type="time" id="input-time" required>
+                    </div>
+                    <button type="submit" class="btn-primary" id="btn-submit-trip">
+                        <span class="material-icons-round">check_circle</span>
+                        Create Trip
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- ============ NOTIFICATION PERMISSION POPUP ============ -->
+        <div id="notif-permission-overlay" class="notif-permission-overlay hidden">
+            <div class="notif-permission-card">
+                <div class="notif-permission-icon">
+                    <span class="material-icons-round">notifications_active</span>
+                </div>
+                <h3 class="notif-permission-title">Stay in the Loop!</h3>
+                <p class="notif-permission-desc">
+                    Enable push notifications to get alerts when new trips are created,
+                    a driver is assigned, or your trip is about to depart.
+                </p>
+                <div class="notif-permission-actions">
+                    <button id="notif-perm-enable" class="notif-perm-btn-enable">
+                        <span class="material-icons-round">notifications_active</span>
+                        Enable Notifications
+                    </button>
+                    <button id="notif-perm-later" class="notif-perm-btn-later">Maybe Later</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ PWA INSTALL BANNER ============ -->
+        <div id="pwa-install-banner" class="pwa-install-banner hidden">
+            <div class="pwa-install-content">
+                <span class="material-icons-round pwa-install-icon">install_mobile</span>
+                <div class="pwa-install-text">
+                    <strong>Install Gamil Family Trips</strong>
+                    <span>Add to your home screen for quick access</span>
+                </div>
+            </div>
+            <div class="pwa-install-actions">
+                <button id="pwa-install-btn" class="pwa-btn-install">Install</button>
+                <button id="pwa-dismiss-btn" class="pwa-btn-dismiss">
+                    <span class="material-icons-round">close</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ============ SAVE AS FREQUENT TRIP PROMPT ============ -->
+        <div id="save-frequent-overlay" class="save-frequent-overlay hidden">
+            <div class="save-frequent-card">
+                <div class="save-frequent-icon">
+                    <span class="material-icons-round">star</span>
+                </div>
+                <h3 class="save-frequent-title">Save as Frequent Trip?</h3>
+                <p class="save-frequent-desc">
+                    Quickly create this trip again tomorrow with a single tap.
+                </p>
+                <p id="save-frequent-dest" class="save-frequent-dest"></p>
+                <div class="form-group save-frequent-label-group">
+                    <label>
+                        <span class="material-icons-round">label</span>
+                        Label (optional)
+                    </label>
+                    <input type="text" id="save-frequent-label" placeholder="e.g., Morning Commute">
+                </div>
+                <div class="save-frequent-actions">
+                    <button id="save-frequent-dismiss" class="save-frequent-btn-later">Not Now</button>
+                    <button id="save-frequent-confirm" class="save-frequent-btn-save">
+                        <span class="material-icons-round">star</span>
+                        Save
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ ROLE SELECTION OVERLAY ============ -->
+        <div id="role-selection-overlay" class="role-overlay hidden">
+            <div class="role-overlay-card">
+                <div class="role-overlay-header">
+                    <span class="material-icons-round role-overlay-icon">directions_car</span>
+                    <h2 class="role-overlay-title">How will you use Gamil Family Trips?</h2>
+                    <p class="role-overlay-subtitle">Choose your role. You can change it anytime from your profile.</p>
+                </div>
+                <div class="role-options">
+                    <button id="role-btn-driver" class="role-option-btn" data-role="driver">
+                        <div class="role-option-icon role-driver-icon">
+                            <span class="material-icons-round">drive_eta</span>
+                        </div>
+                        <div class="role-option-content">
+                            <span class="role-option-name">Driver</span>
+                            <span class="role-option-desc">I drive others to their destination. Get notified about new
+                                trip requests.</span>
+                        </div>
+                        <span class="material-icons-round role-option-check">check_circle</span>
+                    </button>
+                    <button id="role-btn-rider" class="role-option-btn" data-role="rider">
+                        <div class="role-option-icon role-rider-icon">
+                            <span class="material-icons-round">airline_seat_recline_normal</span>
+                        </div>
+                        <div class="role-option-content">
+                            <span class="role-option-name">Rider</span>
+                            <span class="role-option-desc">I join trips as a passenger. I'll be notified when a driver
+                                is assigned.</span>
+                        </div>
+                        <span class="material-icons-round role-option-check">check_circle</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ BOTTOM NAV (mobile only) ============ -->
+        <nav id="bottom-nav">
+            <button class="bottom-nav-tab active" data-view="all-trips">
+                <span class="material-icons-round">list_alt</span>
+                <span>All Trips</span>
+            </button>
+            <button class="bottom-nav-tab" data-view="my-trips">
+                <span class="material-icons-round">person_pin_circle</span>
+                <span>My Trips</span>
+            </button>
+            <button class="bottom-nav-tab" data-view="open-driving">
+                <span class="material-icons-round">drive_eta</span>
+                <span>Driving</span>
+            </button>
+            <button class="bottom-nav-tab" id="bottom-nav-profile">
+                <div id="bottom-nav-avatar" class="bottom-nav-avatar-wrap">
+                    <img id="bottom-nav-photo" src="" alt="Profile">
+                </div>
+                <span>Profile</span>
+            </button>
+        </nav>
+
+        <!-- ============ TOAST CONTAINER ============ -->
+        <div id="toast-container"></div>
+    </div>
+
+    <!-- Bundled by Vite: Firebase (modular SDK) + app code. Messaging, Functions
+         and the sign-in popup are split into chunks that load on demand. -->
+    <script type="module" src="/js/app.js"></script>
+</body>
+
+</html>

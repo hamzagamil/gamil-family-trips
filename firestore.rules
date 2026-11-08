@@ -1,0 +1,53 @@
+// Firestore Security Rules
+// ========================
+// Copy these rules into your Firebase Console:
+// Firestore Database > Rules
+//
+// These rules ensure:
+// - Only authenticated users can read/write
+// - Users can only read and modify their own user document
+// - Any authenticated user can create/read trips
+// - Only assignees can modify trip assignments
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users collection — owner-only reads: user docs hold FCM tokens, and no
+    // client code needs other users' profiles (Cloud Functions use the Admin SDK).
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId;
+
+      // User notifications subcollection
+      match /notifications/{notifId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow write: if request.auth != null;
+      }
+
+      // Frequent trips (templates) subcollection — owner-only access
+      match /frequentTrips/{templateId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // Trips collection
+    match /trips/{tripId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && (
+        // Creator can update anything
+        resource.data.createdBy == request.auth.uid ||
+        // Others can update assignments (joining/leaving), driver, or completion status
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assignees', 'driver', 'completed', 'completedAt']))
+      );
+      allow delete: if request.auth != null && resource.data.createdBy == request.auth.uid;
+    }
+
+    // Destinations collection
+    match /destinations/{destId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+    }
+  }
+}

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Gamil Family Trips</string>
+    <string name="title_activity_main">Gamil Family Trips</string>
+    <string name="package_name">com.dailytripplanner.app</string>
+    <string name="custom_url_scheme">com.dailytripplanner.app</string>
+</resources>

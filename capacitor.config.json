@@ -1,0 +1,41 @@
+{
+  "appId": "com.dailytripplanner.app",
+  "appName": "Gamil Family Trips",
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "never"
+  },
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": true,
+      "providers": ["google.com", "apple.com"]
+    },
+    "FirebaseMessaging": {
+      "presentationOptions": ["alert", "badge", "sound"]
+    },
+    "SplashScreen": {
+      "launchShowDuration": 0,
+      "launchAutoHide": true,
+      "backgroundColor": "#0a0e1a"
+    },
+    "SystemBars": {
+      "insetsHandling": "css",
+      "initialViewportFitValueHint": "cover",
+      "style": "DARK"
+    }
+  },
+  "experimental": {
+    "ios": {
+      "spm": {
+        "swiftToolsVersion": "6.1",
+        "packageTraits": {
+          "@capacitor-firebase/authentication": ["Google"]
+        },
+        "packageOptions": {
+          "@capacitor-firebase/authentication": { "symlink": true },
+          "@capacitor-firebase/messaging": { "symlink": true }
+        }
+      }
+    }
+  }
+}

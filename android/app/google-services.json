@@ -1,0 +1,62 @@
+{
+  "project_info": {
+    "project_number": "999427034595",
+    "project_id": "daily-trip-planner",
+    "storage_bucket": "daily-trip-planner.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:999427034595:android:23d00b9ac7dc6cb258a4d6",
+        "android_client_info": {
+          "package_name": "com.dailytripplanner.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "999427034595-2atg2f7ji1bj5h9t4a8fklhdqhe86en7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dailytripplanner.app",
+            "certificate_hash": "85fdfce6b832f077f1cc66545adbb3c705195940"
+          }
+        },
+        {
+          "client_id": "999427034595-n9j1v12qemg8g1nch5bp60davh8e5tfe.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dailytripplanner.app",
+            "certificate_hash": "03eb0c0c17216ad4712f5d4a875c9f9fbd1dbf77"
+          }
+        },
+        {
+          "client_id": "999427034595-jspnsl1lutnshrg07bn0lqu7vp9514ki.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBLazCWC-VYdVbeHeF30aROb0C1N5A2sfs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "999427034595-jspnsl1lutnshrg07bn0lqu7vp9514ki.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "999427034595-k5rm4alds3n3pj2kas511bpr26lakq5f.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.dailytripplanner.app"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,122 @@
+name: iOS release
+
+# Builds a signed App Store .ipa on macOS; TestFlight upload is explicitly opt-in.
+# Run it from the Actions tab. Signing and API secrets are listed in STORE_RELEASE.md.
+on:
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: "Build number (CFBundleVersion). Empty uses the workflow run number."
+        required: false
+        default: ""
+        type: string
+      upload_to_testflight:
+        description: "Upload this build to App Store Connect / TestFlight"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  testflight:
+    name: Build signed iOS package
+    # Same runner image as Mathani (released Xcode 27 / iOS 27 SDK).
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # --ignore-scripts: skips sharp's native download (only used to generate icons locally)
+      - run: npm ci --ignore-scripts
+      - name: Build web app
+        run: npm run build
+      # Copies dist/ into the iOS project and regenerates the Swift Package list
+      # (this step can't write it on Windows, so the committed Package.swift is incomplete)
+      - name: Sync Capacitor iOS project
+        run: npx cap sync ios
+
+      - name: Install distribution certificate and provisioning profile
+        env:
+          CERT_P12_BASE64: ${{ secrets.IOS_DIST_CERT_P12_BASE64 }}
+          CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          PROFILE_BASE64: ${{ secrets.IOS_APPSTORE_PROFILE_BASE64 }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "$CERT_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/dist.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/dist.p12" -P "$CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          PROFILES="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILES"
+          echo "$PROFILE_BASE64" | base64 --decode > "$PROFILES/tripsync-app-store.mobileprovision"
+          # Xcode 16+ also reads profiles from this location.
+          mkdir -p "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          cp "$PROFILES/tripsync-app-store.mobileprovision" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/"
+          rm "$RUNNER_TEMP/dist.p12"
+
+      - name: Build signed .ipa
+        env:
+          BUILD_NUMBER: ${{ inputs.build_number || github.run_number }}
+        run: |
+          [[ "$BUILD_NUMBER" =~ ^[0-9]+$ ]] || { echo "build_number must contain only digits"; exit 1; }
+          echo "Build number: $BUILD_NUMBER"
+          # Signing (manual, "TripSync App Store" profile) comes from the Release
+          # configuration in ios/App/App.xcodeproj, so the Swift packages aren't affected.
+          xcodebuild archive \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist ios/ExportOptions.plist \
+            -exportPath build/ios/ipa
+
+      - name: Verify push and Sign in with Apple entitlements
+        run: |
+          APP="$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app"
+          codesign -d --entitlements :- "$APP" > "$RUNNER_TEMP/entitlements.plist"
+          plutil -extract aps-environment raw "$RUNNER_TEMP/entitlements.plist" | grep -qx production \
+            || { echo "::error::aps-environment is not production"; exit 1; }
+          plutil -extract com.apple.developer.applesignin raw "$RUNNER_TEMP/entitlements.plist" > /dev/null \
+            || { echo "::error::Sign in with Apple entitlement missing"; exit 1; }
+          test -f "$APP/GoogleService-Info.plist" || { echo "::error::GoogleService-Info.plist not bundled"; exit 1; }
+          echo "Entitlements and Firebase config OK"
+
+      - name: Upload to App Store Connect
+        if: ${{ inputs.upload_to_testflight }}
+        env:
+          KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          printf '%s\n' "$PRIVATE_KEY" > "$HOME/.appstoreconnect/private_keys/AuthKey_$KEY_ID.p8"
+          xcrun altool --upload-app --type ios --file build/ios/ipa/*.ipa \
+            --apiKey "$KEY_ID" --apiIssuer "$ISSUER_ID"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-release-${{ github.run_number }}
+          path: build/ios/ipa/*.ipa
+          if-no-files-found: ignore
+
+      - name: Remove signing files
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+          rm -rf "$HOME/.appstoreconnect/private_keys"
+          rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/tripsync-app-store.mobileprovision"
