@@ -22,11 +22,35 @@
           }
         },
         {
+          "client_id": "999427034595-9n37cb8mjeojukel3258lo1omqn08o2g.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dailytripplanner.app",
+            "certificate_hash": "bebf022a1c20ce791ca80348a8fc17f9b6eccbcc"
+          }
+        },
+        {
+          "client_id": "999427034595-fugut4v21ovv8c932iio3c3t2gathst5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dailytripplanner.app",
+            "certificate_hash": "c51b318bba86f1f4a9f8880a1b4c094d375bfdfe"
+          }
+        },
+        {
           "client_id": "999427034595-n9j1v12qemg8g1nch5bp60davh8e5tfe.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.dailytripplanner.app",
             "certificate_hash": "03eb0c0c17216ad4712f5d4a875c9f9fbd1dbf77"
+          }
+        },
+        {
+          "client_id": "999427034595-sfv4c3h7g020evdbshqf9om9cbhsghb7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dailytripplanner.app",
+            "certificate_hash": "611f95d63b532332d78e9cbb4d4c3425663f8a03"
           }
         },
         {
