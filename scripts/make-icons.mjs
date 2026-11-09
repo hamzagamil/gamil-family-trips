@@ -32,6 +32,8 @@ function icon(size, { background = true, scale = 0.6, rounded = false } = {}) {
 }
 
 const png = (svg, file) => sharp(Buffer.from(svg)).png().toFile(file);
+// Play feature graphic must be a 24-bit PNG (no alpha channel)
+const pngOpaque = (svg, file) => sharp(Buffer.from(svg)).flatten({ background: '#0a0e1a' }).removeAlpha().png().toFile(file);
 
 mkdirSync('assets', { recursive: true });
 mkdirSync('store-assets', { recursive: true });
@@ -56,7 +58,7 @@ await png(splash(2732), 'assets/splash-dark.png');
 
 // Google Play listing: 512×512 icon and 1024×500 feature graphic
 await png(icon(512), 'store-assets/play-icon-512.png');
-await png(`<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500">
+await pngOpaque(`<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500">
   <defs>${gradient}</defs>
   <rect width="1024" height="500" fill="url(#g)"/>
   <g transform="translate(96 130)">
