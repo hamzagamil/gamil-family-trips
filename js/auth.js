@@ -421,9 +421,9 @@ export const Auth = (() => {
         if (psDriverBtn) psDriverBtn.classList.toggle('selected', role === 'driver');
         if (psRiderBtn) psRiderBtn.classList.toggle('selected', role === 'rider');
 
-        // Legacy hidden badge (for any other modules that read it)
+        // Legacy badge: kept in sync for any module that reads it, but always
+        // hidden (un-hiding it showed a stray "drive_eta Driver" in the profile sheet)
         if (menuRoleDisplay) {
-            menuRoleDisplay.classList.remove('hidden');
             if (menuRoleIcon) menuRoleIcon.textContent = role === 'driver' ? 'drive_eta' : 'airline_seat_recline_normal';
             if (menuRoleLabel) menuRoleLabel.textContent = role === 'driver' ? 'Driver' : 'Rider';
         }
