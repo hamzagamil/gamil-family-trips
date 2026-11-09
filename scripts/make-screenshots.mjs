@@ -5,8 +5,8 @@
 //        Name a file "2.png" (number only) for no caption.
 //   2. node scripts/make-screenshots.mjs
 // Output:
-//   store-assets/play-screenshots/  1080×1920 (9:16, Google Play phone)
-//   store-assets/ios-screenshots/   1320×2868 (6.9" iPhone, App Store)
+//   store-assets/play-screenshots/play-1080x1920-NN.png                   Google Play phone (9:16)
+//   store-assets/ios-screenshots/appstore-iphone-6.9in-1320x2868-NN.png   App Store, iPhone 6.9" slot
 
 import sharp from 'sharp';
 import { mkdirSync, readdirSync } from 'node:fs';
@@ -14,8 +14,8 @@ import { join, parse } from 'node:path';
 
 const RAW = 'screenshots/raw';
 const TARGETS = [
-    { dir: 'store-assets/play-screenshots', width: 1080, height: 1920 },
-    { dir: 'store-assets/ios-screenshots', width: 1320, height: 2868 }
+    { dir: 'store-assets/play-screenshots', prefix: 'play-1080x1920', width: 1080, height: 1920 },
+    { dir: 'store-assets/ios-screenshots', prefix: 'appstore-iphone-6.9in-1320x2868', width: 1320, height: 2868 }
 ];
 
 const escapeXml = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
@@ -75,7 +75,7 @@ for (const t of TARGETS) mkdirSync(t.dir, { recursive: true });
 for (const [i, f] of files.entries()) {
     const caption = parse(f).name.replace(/^\s*\d+\s*[-_.)]?\s*/, '').trim();
     for (const t of TARGETS) {
-        const out = join(t.dir, `${String(i + 1).padStart(2, '0')}.png`);
+        const out = join(t.dir, `${t.prefix}-${String(i + 1).padStart(2, '0')}.png`);
         await (await frame(join(RAW, f), t, caption)).toFile(out);
     }
     console.log(`${f} → ${caption ? `"${caption}"` : '(no caption)'}`);
