@@ -80,3 +80,5 @@ android/keystore.properties
 
 # Raw store screenshots (may show family names/photos)
 screenshots/raw/
+store-assets/play-screenshots/
+store-assets/ios-screenshots/

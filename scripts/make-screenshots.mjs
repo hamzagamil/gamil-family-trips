@@ -27,7 +27,7 @@ function background(width, height, caption) {
     const lines = [];
     for (const w of words) {
         const last = lines[lines.length - 1];
-        if (last && (last + ' ' + w).length <= 22) lines[lines.length - 1] = last + ' ' + w;
+        if (last && (last + ' ' + w).length <= 26) lines[lines.length - 1] = last + ' ' + w;
         else lines.push(w);
     }
     const text = lines.slice(0, 2).map((line, i) =>
@@ -56,8 +56,10 @@ async function frame(file, { width, height }, caption) {
     const mask = Buffer.from(`<svg width="${info.width}" height="${info.height}"><rect width="${info.width}" height="${info.height}" rx="${r}" fill="#fff"/></svg>`);
     const rounded = await sharp(data).composite([{ input: mask, blend: 'dest-in' }]).png().toBuffer();
 
+    // Centre the screenshot in the space below the caption (wide shots leave room)
+    const y = top + Math.max(0, Math.round((maxH - info.height) / 2));
     return sharp(background(width, height, caption))
-        .composite([{ input: rounded, left: Math.round((width - info.width) / 2), top }])
+        .composite([{ input: rounded, left: Math.round((width - info.width) / 2), top: y }])
         .flatten({ background: '#0a0e1a' })
         .removeAlpha()
         .png();
