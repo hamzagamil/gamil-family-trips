@@ -77,3 +77,6 @@ dist/
 android/keystore.properties
 *.p8
 *.mobileprovision
+
+# Raw store screenshots (may show family names/photos)
+screenshots/raw/
