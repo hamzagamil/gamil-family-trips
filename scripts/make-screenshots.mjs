@@ -6,7 +6,8 @@
 //   2. node scripts/make-screenshots.mjs
 // Output:
 //   store-assets/play-screenshots/play-1080x1920-NN.png                   Google Play phone (9:16)
-//   store-assets/ios-screenshots/appstore-iphone-6.9in-1320x2868-NN.png   App Store, iPhone 6.9" slot
+//   store-assets/ios-screenshots/appstore-iphone-medium-1206x2622-NN.png  App Store, "iPhone with Dynamic Island (medium display)"
+//   store-assets/ios-screenshots/appstore-iphone-large-1320x2868-NN.png   App Store, large iPhone (6.9") if asked for
 
 import sharp from 'sharp';
 import { mkdirSync, readdirSync } from 'node:fs';
@@ -15,7 +16,10 @@ import { join, parse } from 'node:path';
 const RAW = 'screenshots/raw';
 const TARGETS = [
     { dir: 'store-assets/play-screenshots', prefix: 'play-1080x1920', width: 1080, height: 1920 },
-    { dir: 'store-assets/ios-screenshots', prefix: 'appstore-iphone-6.9in-1320x2868', width: 1320, height: 2868 }
+    // App Store Connect: "iPhone with Dynamic Island (medium display)" slot, 6.1"/6.3" (1206×2622)
+    { dir: 'store-assets/ios-screenshots', prefix: 'appstore-iphone-medium-1206x2622', width: 1206, height: 2622 },
+    // Large iPhone (6.9") size, in case App Store Connect asks for it separately
+    { dir: 'store-assets/ios-screenshots', prefix: 'appstore-iphone-large-1320x2868', width: 1320, height: 2868 }
 ];
 
 const escapeXml = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[c]));
