@@ -6,17 +6,25 @@ import {
     onAuthStateChanged, signInWithPopup, signInWithCredential, signOut as firebaseSignOut,
     GoogleAuthProvider, OAuthProvider, browserPopupRedirectResolver, revokeAccessToken
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { auth, db, ensureFunctions } from './firebase-config.js';
 import { isNative, platform, nativeGoogleSignIn, nativeAppleSignIn, nativeSignOut } from './platform.js';
 import { Toast } from './toast.js';
 import { App } from './app.js';
 import { Notifications } from './notifications.js';
-import { readSessionHint, writeSessionHint, clearSessionHint } from './utils.js';
+import { Approvals } from './approvals.js';
+import { readSessionHint, writeSessionHint, clearSessionHint, notificationPermission } from './utils.js';
 
 export const Auth = (() => {
     let currentUser = null;
     const provider = new GoogleAuthProvider();
+
+    // Live listener on users/{uid}: approval status, admin flag and role
+    let unsubscribeProfile = null;
+    // Trip listeners etc. are running (App.onUserReady was called)
+    let appStarted = false;
+    // The first-login role picker was already offered this session
+    let rolePickerOffered = false;
 
     // ---- DOM refs ----
     const authScreen = document.getElementById('auth-screen');
@@ -25,6 +33,16 @@ export const Auth = (() => {
     const btnSignout = document.getElementById('btn-signout');
     const btnAppleSignin = document.getElementById('btn-apple-signin');
     const btnDeleteAccount = document.getElementById('btn-delete-account');
+
+    // Waiting-for-approval screen
+    const pendingCard = document.querySelector('#pending-screen .pending-card');
+    const pendingIcon = document.getElementById('pending-icon');
+    const pendingTitle = document.getElementById('pending-title');
+    const pendingText = document.getElementById('pending-text');
+    const pendingEmail = document.getElementById('pending-email');
+    const btnPendingNotify = document.getElementById('btn-pending-notify');
+    const btnPendingSignout = document.getElementById('btn-pending-signout');
+    const btnPendingDelete = document.getElementById('btn-pending-delete');
 
     // Top-nav avatar (desktop)
     const userAvatar = document.getElementById('user-avatar');
@@ -77,6 +95,15 @@ export const Auth = (() => {
             btnAppleSignin.addEventListener('click', signInWithApple);
         }
         if (btnDeleteAccount) btnDeleteAccount.addEventListener('click', deleteAccount);
+        if (btnPendingDelete) btnPendingDelete.addEventListener('click', deleteAccount);
+        if (btnPendingSignout) btnPendingSignout.addEventListener('click', signOut);
+        if (btnPendingNotify) {
+            btnPendingNotify.addEventListener('click', async () => {
+                await Notifications.requestPermission();
+                updatePendingNotifyButton();
+            });
+        }
+        Approvals.init();
 
         // Open profile sheet — desktop top-nav avatar
         userAvatar.addEventListener('click', (e) => {
@@ -229,7 +256,7 @@ export const Auth = (() => {
         );
         if (!ok) return;
 
-        btnDeleteAccount.disabled = true;
+        setDeleteButtonsDisabled(true);
         try {
             // Sign in with Apple accounts: revoke the app's Apple tokens too
             // (Apple requires this when an account is deleted). Needs a fresh
@@ -258,8 +285,13 @@ export const Auth = (() => {
             console.error('Account deletion failed:', error);
             Toast.show('Could not delete account: ' + error.message, 'error');
         } finally {
-            btnDeleteAccount.disabled = false;
+            setDeleteButtonsDisabled(false);
         }
+    }
+
+    function setDeleteButtonsDisabled(disabled) {
+        if (btnDeleteAccount) btnDeleteAccount.disabled = disabled;
+        if (btnPendingDelete) btnPendingDelete.disabled = disabled;
     }
 
     // ---- Auth state ----
@@ -269,7 +301,11 @@ export const Auth = (() => {
 
         if (user) {
             const hint = readSessionHint();
-            const cachedRole = hint && hint.uid === user.uid ? hint.role : null;
+            const sameUser = hint && hint.uid === user.uid;
+            const cachedRole = sameUser ? hint.role : null;
+            // Hints written before approvals existed have no status: those
+            // accounts predate approvals, so they count as approved.
+            const cachedStatus = sameUser ? (hint.status || 'approved') : 'pending';
 
             currentUser = {
                 uid: user.uid,
@@ -277,60 +313,155 @@ export const Auth = (() => {
                 email: user.email,
                 photoURL: user.photoURL || generateAvatar(user.displayName),
                 createdAt: user.metadata.creationTime,
-                role: cachedRole
+                role: cachedRole,
+                status: cachedStatus,
+                admin: sameUser ? hint.admin === true : false
             };
 
             applyProfileToUI(currentUser);
             if (cachedRole) updateRoleUI(cachedRole);
             saveSessionHint();
 
-            // Switch screens and start the trip listeners immediately — the
-            // profile read/write below no longer sits in front of them.
             resetSignInButtons();
             authScreen.classList.remove('active');
             appScreen.classList.add('active');
             document.documentElement.classList.add('has-session');
 
-            App.onUserReady(currentUser);
+            // Approved last time → start the trip listeners immediately; the
+            // profile listener below corrects things if that has changed.
+            applyStatus(cachedStatus);
+            if (currentUser.admin && cachedStatus === 'approved') Approvals.setAdmin(true);
 
-            syncProfile(user.uid, cachedRole);
+            syncProfile(user.uid);
         } else {
-            const wasSignedIn = currentUser !== null;
+            const wasStarted = appStarted;
             currentUser = null;
+            appStarted = false;
+            rolePickerOffered = false;
+            stopProfileListener();
+            Approvals.setAdmin(false);
             clearSessionHint();
             closeProfileSheet();
-            document.documentElement.classList.remove('has-session');
+            document.documentElement.classList.remove('has-session', 'awaiting-approval');
             authScreen.classList.add('active');
             appScreen.classList.remove('active');
-            if (wasSignedIn) App.onUserSignedOut();
+            if (roleOverlay) roleOverlay.classList.add('hidden');
+            if (wasStarted) App.onUserSignedOut();
         }
     }
 
-    // Upsert the profile and fetch the stored role in the background
-    function syncProfile(uid, cachedRole) {
-        const userDocRef = doc(db, 'users', uid);
+    // Show the app (approved) or the waiting screen (pending / declined)
+    function applyStatus(status) {
+        if (status === 'approved') {
+            document.documentElement.classList.remove('awaiting-approval');
+            if (!appStarted) {
+                appStarted = true;
+                App.onUserReady(currentUser);
+            }
+        } else {
+            showPendingScreen(status);
+            document.documentElement.classList.add('awaiting-approval');
+            closeProfileSheet();
+            if (roleOverlay) roleOverlay.classList.add('hidden');
+            if (appStarted) {
+                appStarted = false;
+                App.onUserSignedOut(); // stop trip listeners and reminders
+            }
+        }
+    }
 
-        setDoc(userDocRef, {
+    function showPendingScreen(status) {
+        const declined = status === 'declined';
+        if (pendingCard) pendingCard.classList.toggle('declined', declined);
+        if (pendingIcon) pendingIcon.textContent = declined ? 'block' : 'hourglass_top';
+        if (pendingTitle) pendingTitle.textContent = declined ? 'Access not approved' : 'Waiting for approval';
+        if (pendingText) {
+            pendingText.textContent = declined
+                ? 'An admin declined access for this account. If you think this is a mistake, contact the family member who invited you.'
+                : "An admin needs to approve your account before you can see and join trips. This screen updates by itself once you're approved.";
+        }
+        if (pendingEmail && currentUser) pendingEmail.textContent = currentUser.email || currentUser.displayName;
+        updatePendingNotifyButton();
+    }
+
+    // Offer push permission so the "You're in!" notification can reach them
+    function updatePendingNotifyButton() {
+        if (!btnPendingNotify) return;
+        const declined = currentUser?.status === 'declined';
+        const permission = notificationPermission();
+        btnPendingNotify.classList.toggle('hidden', declined || permission === 'granted' || permission === 'unsupported');
+    }
+
+    // Save the profile (creating the doc as a pending request on first sign-in)
+    // and follow the doc live: approval, admin flag and role all live there.
+    async function syncProfile(uid) {
+        const userDocRef = doc(db, 'users', uid);
+        const profile = {
             displayName: currentUser.displayName,
             email: currentUser.email,
             photoURL: currentUser.photoURL,
             lastSeen: serverTimestamp()
-        }, { merge: true }).catch((err) => console.warn('Profile sync failed:', err.message));
+        };
 
-        getDoc(userDocRef).then((snap) => {
+        stopProfileListener();
+        // includeMetadataChanges: act only on server-confirmed snapshots. A
+        // cache-only view of the doc can lack fields (e.g. status) and would
+        // wrongly flip an approved user to the waiting screen.
+        unsubscribeProfile = onSnapshot(userDocRef, { includeMetadataChanges: true }, (snap) => {
             if (!currentUser || currentUser.uid !== uid) return; // signed out meanwhile
-            const role = snap.exists() ? (snap.data().role || null) : null;
-            currentUser.role = role;
-            saveSessionHint();
-            if (role) {
-                if (role !== cachedRole) updateRoleUI(role);
-            } else {
-                showRolePicker();
-            }
-        }).catch((err) => {
-            // Offline with nothing cached — keep the cached role, don't nag with the picker
-            console.warn('Could not load user role:', err.message);
+            if (snap.metadata.fromCache || snap.metadata.hasPendingWrites) return;
+            onProfileSnapshot(snap);
+        }, (err) => {
+            // Offline with nothing cached — keep the cached state
+            console.warn('Could not load user profile:', err.message);
         });
+
+        try {
+            await updateDoc(userDocRef, profile);
+        } catch (err) {
+            if (err.code !== 'not-found') {
+                console.warn('Profile sync failed:', err.message);
+                return;
+            }
+            // First sign-in: create the account as a join request.
+            // firestore.rules only allow status 'pending' here.
+            try {
+                await setDoc(userDocRef, { ...profile, status: 'pending', requestedAt: serverTimestamp() });
+            } catch (createErr) {
+                console.warn('Could not create profile:', createErr.message);
+            }
+        }
+    }
+
+    function onProfileSnapshot(snap) {
+        const data = snap.exists() ? snap.data() : null;
+        // No doc yet → it's being created as a pending request.
+        // A doc without status predates approvals → approved.
+        const status = data ? (data.status || 'approved') : 'pending';
+        const role = data?.role || null;
+        const admin = data?.admin === true;
+
+        const prevRole = currentUser.role;
+        currentUser.status = status;
+        currentUser.role = role;
+        currentUser.admin = admin;
+        saveSessionHint();
+
+        applyStatus(status);
+        Approvals.setAdmin(admin && status === 'approved');
+
+        if (status !== 'approved') return;
+        if (role) {
+            if (role !== prevRole) updateRoleUI(role);
+        } else if (!rolePickerOffered) {
+            rolePickerOffered = true;
+            showRolePicker();
+        }
+    }
+
+    function stopProfileListener() {
+        if (unsubscribeProfile) unsubscribeProfile();
+        unsubscribeProfile = null;
     }
 
     function saveSessionHint() {
@@ -340,7 +471,9 @@ export const Auth = (() => {
             displayName: currentUser.displayName,
             email: currentUser.email,
             photoURL: currentUser.photoURL,
-            role: currentUser.role || null
+            role: currentUser.role || null,
+            status: currentUser.status || null,
+            admin: currentUser.admin === true
         });
     }
 

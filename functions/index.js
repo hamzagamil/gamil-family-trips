@@ -12,10 +12,17 @@
  *
  * 3. deleteAccount (callable HTTPS):
  *    In-app account deletion (App Store 5.1.1(v) / Google Play requirement).
+ *
+ * 4. notifyAdminsOfJoinRequest (Firestore trigger, users/{uid} created):
+ *    New accounts start with status "pending" — push every admin.
+ *
+ * 5. setUserApproval (callable HTTPS, admins only):
+ *    Approve or decline a pending account; pushes the user when approved.
  */
 
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, Timestamp, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
@@ -67,6 +74,15 @@ function cairoWallTimeToUTC(dateStr, hours, minutes) {
     );
     const offsetMs = cairoAsUTC - candidate.getTime();
     return new Date(candidate.getTime() - offsetMs);
+}
+
+/**
+ * Whether a users/{uid} doc belongs to an approved account. Accounts created
+ * before approvals existed have no status and count as approved (same as
+ * firestore.rules).
+ */
+function isApprovedUser(userData) {
+    return !!userData && userData.status !== "pending" && userData.status !== "declined";
 }
 
 /** Format HH:MM (24h) as h:MM AM/PM */
@@ -157,8 +173,8 @@ async function broadcastNewTrips() {
             const uid = userDoc.id;
             const userData = userDoc.data();
 
-            // Only send new-trip alerts to drivers
-            if (userData.role !== 'driver') continue;
+            // Only send new-trip alerts to approved drivers
+            if (userData.role !== 'driver' || !isApprovedUser(userData)) continue;
 
             // Skip the creator — they don't need to be notified about their own trip
             if (uid === creatorUid) continue;
@@ -424,6 +440,10 @@ exports.sendDriverNotification = onCall(
         if (!request.auth) {
             throw new HttpsError("unauthenticated", "Must be signed in.");
         }
+        const caller = await db.collection("users").doc(request.auth.uid).get();
+        if (!isApprovedUser(caller.data())) {
+            throw new HttpsError("permission-denied", "Your account has not been approved yet.");
+        }
 
         const {
             tripId,
@@ -584,6 +604,95 @@ exports.deleteAccount = onCall(
         }
 
         console.log(`[deleteAccount] Done for ${uid}: ${created} created trip(s) removed, ${joined} trip membership(s) removed`);
+        return { ok: true };
+    }
+);
+
+// ─────────────────────────────────────────────
+// Account approval
+// ─────────────────────────────────────────────
+
+/**
+ * A new account was created (always with status "pending" — enforced by
+ * firestore.rules). Push every admin so they can approve it.
+ */
+exports.notifyAdminsOfJoinRequest = onDocumentCreated(
+    { document: "users/{uid}", region: "us-central1" },
+    async (event) => {
+        const user = event.data ? event.data.data() : null;
+        if (!user || user.status !== "pending") return;
+
+        const admins = await db.collection("users").where("admin", "==", true).get();
+        if (admins.empty) {
+            console.warn("[joinRequest] No admins configured — nobody to approve", event.params.uid);
+            return;
+        }
+
+        const name = user.displayName || user.email || "Someone";
+        const notification = {
+            title: "👋 New join request",
+            body: `${name} wants to join Gamil Family Trips. Open your profile to approve.`,
+        };
+
+        console.log(`[joinRequest] ${event.params.uid} pending — notifying ${admins.size} admin(s)`);
+        await Promise.allSettled(admins.docs.map((admin) => {
+            const tokens = admin.data().fcmTokens || [];
+            if (tokens.length === 0) return null;
+            return sendPushToUserTokens(admin.id, tokens, notification, {
+                tripId: "",
+                type: "join_request",
+                tag: `join-request-${event.params.uid}`,
+            });
+        }));
+    }
+);
+
+/**
+ * Admins approve or decline an account.
+ * request.data: { uid, status: "approved" | "declined" }
+ */
+exports.setUserApproval = onCall(
+    { region: "us-central1" },
+    async (request) => {
+        if (!request.auth) {
+            throw new HttpsError("unauthenticated", "Must be signed in.");
+        }
+        const caller = await db.collection("users").doc(request.auth.uid).get();
+        if (!caller.exists || caller.data().admin !== true) {
+            throw new HttpsError("permission-denied", "Only admins can approve accounts.");
+        }
+
+        const { uid, status } = request.data || {};
+        if (typeof uid !== "string" || !uid || !["approved", "declined"].includes(status)) {
+            throw new HttpsError("invalid-argument", "Expected { uid, status: 'approved' | 'declined' }.");
+        }
+        if (uid === request.auth.uid) {
+            throw new HttpsError("invalid-argument", "You can't change your own approval.");
+        }
+
+        const userRef = db.collection("users").doc(uid);
+        const userSnap = await userRef.get();
+        if (!userSnap.exists) {
+            throw new HttpsError("not-found", "That account no longer exists.");
+        }
+
+        await userRef.update({
+            status,
+            decidedBy: request.auth.uid,
+            decidedAt: Timestamp.now(),
+        });
+        console.log(`[setUserApproval] ${request.auth.uid} set ${uid} → ${status}`);
+
+        if (status === "approved") {
+            const tokens = userSnap.data().fcmTokens || [];
+            if (tokens.length > 0) {
+                await sendPushToUserTokens(uid, tokens, {
+                    title: "✅ You're in!",
+                    body: "Your Gamil Family Trips account was approved. Open the app to see and join trips.",
+                }, { tripId: "", type: "approved", tag: `approved-${uid}` });
+            }
+        }
+
         return { ok: true };
     }
 );

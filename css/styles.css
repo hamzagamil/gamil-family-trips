@@ -3536,3 +3536,204 @@ img[src=""] {
 .profile-delete-account:disabled {
     opacity: 0.5;
 }
+
+/* ========================================
+   ACCOUNT APPROVAL
+   ======================================== */
+
+/* Signed in but not approved: the waiting screen replaces the app shell.
+   Must come after the .has-session rules above (same specificity). */
+.awaiting-approval #auth-screen,
+.awaiting-approval #app-screen {
+    display: none;
+}
+
+.awaiting-approval #pending-screen {
+    display: block;
+}
+
+.pending-card .auth-logo {
+    animation: none;
+}
+
+.pending-card.declined .auth-logo {
+    background: var(--danger-bg);
+    box-shadow: none;
+}
+
+.pending-card.declined .logo-icon {
+    color: var(--danger);
+}
+
+.pending-title {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+    letter-spacing: -0.01em;
+}
+
+.pending-text {
+    margin-bottom: 24px;
+}
+
+.auth-card .pending-notify {
+    margin-bottom: 20px;
+}
+
+.pending-notify .material-icons-round {
+    font-size: 20px;
+    color: var(--accent-primary);
+}
+
+.pending-account {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
+.pending-account strong {
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+@media (max-width: 480px) {
+    .pending-card {
+        padding: 40px 24px;
+    }
+}
+
+/* Join-request count on the avatars (admins). The avatars clip their
+   contents, so let the photo do the rounding and the badge overflow. */
+#user-avatar,
+#bottom-nav-avatar {
+    position: relative;
+    overflow: visible;
+}
+
+#user-avatar img,
+#bottom-nav-avatar img {
+    border-radius: 50%;
+}
+
+#bottom-nav-avatar .badge {
+    top: -6px;
+    right: -10px;
+    min-width: 16px;
+    height: 16px;
+    font-size: 0.62rem;
+}
+
+/* Join requests list in the profile sheet */
+.approvals-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.approvals-empty {
+    padding: 12px 4px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.approval-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-md);
+}
+
+.approval-photo {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--bg-glass-strong);
+}
+
+.approval-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+}
+
+.approval-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.approval-email {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.approval-tag {
+    align-self: flex-start;
+    margin-top: 4px;
+    padding: 1px 8px;
+    border-radius: var(--radius-full);
+    background: var(--danger-bg);
+    color: var(--danger);
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+.approval-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.approval-btn {
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1.5px solid transparent;
+    cursor: pointer;
+    transition: var(--transition-fast);
+}
+
+.approval-btn .material-icons-round {
+    font-size: 20px;
+}
+
+.approval-btn.approve {
+    background: var(--success-bg);
+    border-color: rgba(34, 197, 94, 0.3);
+    color: var(--success);
+}
+
+.approval-btn.approve:hover {
+    background: rgba(34, 197, 94, 0.22);
+}
+
+.approval-btn.decline {
+    background: var(--danger-bg);
+    border-color: rgba(239, 68, 68, 0.25);
+    color: var(--danger);
+}
+
+.approval-btn.decline:hover {
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.approval-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}

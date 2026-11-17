@@ -1,53 +1,83 @@
-// Firestore Security Rules
+// Firestore Security Rules (deployed with `firebase deploy --only firestore:rules`)
 // ========================
-// Copy these rules into your Firebase Console:
-// Firestore Database > Rules
 //
-// These rules ensure:
-// - Only authenticated users can read/write
-// - Users can only read and modify their own user document
-// - Any authenticated user can create/read trips
-// - Only assignees can modify trip assignments
+// Access requires an APPROVED account:
+// - A new account's users/{uid} doc must be created with status 'pending'.
+//   Only the setUserApproval Cloud Function (an admin's decision) changes it
+//   to 'approved' or 'declined'; clients can never write status or admin.
+// - Accounts created before approvals existed have no status field and
+//   count as approved.
+// - No user doc → not approved.
+// - Admins (admin: true, set by hand in the Firebase Console) can read
+//   every user doc to see join requests.
 
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users collection — owner-only reads: user docs hold FCM tokens, and no
-    // client code needs other users' profiles (Cloud Functions use the Admin SDK).
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function myPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function isApproved() {
+      return signedIn() && exists(myPath())
+        && !(get(myPath()).data.get('status', 'approved') in ['pending', 'declined']);
+    }
+
+    function isAdmin() {
+      return signedIn() && exists(myPath())
+        && get(myPath()).data.get('admin', false) == true;
+    }
+
+    // Fields only the Admin SDK (Cloud Functions / Console) may write
+    function touchesProtectedFields() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['status', 'admin', 'decidedBy', 'decidedAt']);
+    }
+
+    // Users collection — owner-only reads (user docs hold FCM tokens), plus
+    // admins, who review join requests.
     match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if signedIn() && request.auth.uid == userId
+        && request.resource.data.status == 'pending'
+        && !request.resource.data.keys().hasAny(['admin', 'decidedBy', 'decidedAt']);
+      allow update: if signedIn() && request.auth.uid == userId && !touchesProtectedFields();
+      allow delete: if signedIn() && request.auth.uid == userId;
 
       // User notifications subcollection
       match /notifications/{notifId} {
-        allow read: if request.auth != null && request.auth.uid == userId;
-        allow write: if request.auth != null;
+        allow read: if signedIn() && request.auth.uid == userId;
+        allow write: if signedIn() && (request.auth.uid == userId || isApproved());
       }
 
       // Frequent trips (templates) subcollection — owner-only access
       match /frequentTrips/{templateId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if signedIn() && request.auth.uid == userId;
       }
     }
 
-    // Trips collection
+    // Trips collection — approved accounts only
     match /trips/{tripId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null && (
+      allow read: if isApproved();
+      allow create: if isApproved();
+      allow update: if isApproved() && (
         // Creator can update anything
         resource.data.createdBy == request.auth.uid ||
         // Others can update assignments (joining/leaving), driver, or completion status
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assignees', 'driver', 'completed', 'completedAt']))
       );
-      allow delete: if request.auth != null && resource.data.createdBy == request.auth.uid;
+      allow delete: if isApproved() && resource.data.createdBy == request.auth.uid;
     }
 
-    // Destinations collection
+    // Destinations collection — approved accounts only
     match /destinations/{destId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
+      allow read: if isApproved();
+      allow create: if isApproved();
     }
   }
 }

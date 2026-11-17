@@ -20,7 +20,12 @@
     <!-- Returning user? Show the app shell instead of the sign-in screen while
          Firebase restores the session. The hint is written by js/auth.js. -->
     <script>
-        try { if (localStorage.getItem('tripsync:session')) document.documentElement.classList.add('has-session'); } catch (e) {}
+        try {
+            var hint = JSON.parse(localStorage.getItem('tripsync:session') || 'null');
+            if (hint) document.documentElement.classList.add('has-session');
+            // Account not approved yet: show the waiting screen, not the app shell
+            if (hint && (hint.status === 'pending' || hint.status === 'declined')) document.documentElement.classList.add('awaiting-approval');
+        } catch (e) {}
     </script>
 
     <link rel="icon" type="image/svg+xml"
@@ -38,11 +43,11 @@
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&amp;display=swap"
         onload="this.onload=null;this.rel='stylesheet'">
     <link rel="preload" as="style"
-        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0&amp;icon_names=add,add_circle,airline_seat_recline_normal,bolt,calendar_today,check_circle,chevron_left,chevron_right,close,delete,directions_car,drive_eta,edit,error,expand_more,group,info,install_mobile,label,list_alt,logout,manage_accounts,no_crash,notifications,notifications_active,person,person_add,person_off,person_pin_circle,person_remove,place,route,schedule,settings,star,task_alt&amp;display=block"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0&amp;icon_names=add,add_circle,airline_seat_recline_normal,block,bolt,calendar_today,check,check_circle,chevron_left,chevron_right,close,delete,directions_car,drive_eta,edit,error,expand_more,group,hourglass_top,how_to_reg,info,install_mobile,label,list_alt,logout,manage_accounts,no_crash,notifications,notifications_active,person,person_add,person_off,person_pin_circle,person_remove,place,route,schedule,settings,star,task_alt&amp;display=block"
         onload="this.onload=null;this.rel='stylesheet'">
     <noscript>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&amp;display=swap">
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0&amp;icon_names=add,add_circle,airline_seat_recline_normal,bolt,calendar_today,check_circle,chevron_left,chevron_right,close,delete,directions_car,drive_eta,edit,error,expand_more,group,info,install_mobile,label,list_alt,logout,manage_accounts,no_crash,notifications,notifications_active,person,person_add,person_off,person_pin_circle,person_remove,place,route,schedule,settings,star,task_alt&amp;display=block">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0&amp;icon_names=add,add_circle,airline_seat_recline_normal,block,bolt,calendar_today,check,check_circle,chevron_left,chevron_right,close,delete,directions_car,drive_eta,edit,error,expand_more,group,hourglass_top,how_to_reg,info,install_mobile,label,list_alt,logout,manage_accounts,no_crash,notifications,notifications_active,person,person_add,person_off,person_pin_circle,person_remove,place,route,schedule,settings,star,task_alt&amp;display=block">
     </noscript>
 
     <link rel="stylesheet" href="/css/styles.css">
@@ -88,6 +93,39 @@
         </div>
     </div>
 
+    <!-- ============ AWAITING APPROVAL ============ -->
+    <!-- Signed in, but an admin hasn't approved the account yet (or declined it).
+         Shown via the awaiting-approval class on <html> (js/auth.js). -->
+    <div id="pending-screen" class="screen">
+        <div class="auth-container">
+            <div class="auth-glow"></div>
+            <div class="auth-card pending-card">
+                <div class="auth-logo">
+                    <span id="pending-icon" class="material-icons-round logo-icon">hourglass_top</span>
+                </div>
+                <h1 id="pending-title" class="pending-title">Waiting for approval</h1>
+                <p id="pending-text" class="auth-subtitle pending-text">
+                    An admin needs to approve your account before you can see and join trips.
+                    This screen updates by itself once you're approved.
+                </p>
+                <button id="btn-pending-notify" class="btn-google pending-notify hidden">
+                    <span class="material-icons-round">notifications_active</span>
+                    <span>Notify me when approved</span>
+                </button>
+                <p class="pending-account">Signed in as <strong id="pending-email"></strong></p>
+                <button id="btn-pending-signout" class="profile-signout-btn">
+                    <span class="material-icons-round">logout</span>
+                    Sign Out
+                </button>
+                <div class="profile-legal-links">
+                    <a href="https://daily-trip-planner.web.app/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
+                    <span aria-hidden="true">·</span>
+                    <button id="btn-pending-delete" class="profile-delete-account">Delete account</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- ============ MAIN APP ============ -->
     <div id="app-screen" class="screen">
         <!-- Top Nav -->
@@ -117,6 +155,7 @@
                 </div>
                 <div id="user-avatar" class="avatar" title="Account">
                     <img id="user-photo" src="" alt="User">
+                    <span class="badge approvals-badge hidden" title="Join requests">0</span>
                 </div>
             </div>
         </nav>
@@ -147,6 +186,16 @@
 
                 <!-- Divider -->
                 <div class="profile-divider"></div>
+
+                <!-- Join requests (admins only, shown by js/approvals.js) -->
+                <div class="profile-section hidden" id="profile-approvals-section">
+                    <p class="profile-section-title">
+                        <span class="material-icons-round">how_to_reg</span>
+                        Join Requests
+                    </p>
+                    <div id="approvals-list" class="approvals-list"></div>
+                </div>
+                <div class="profile-divider hidden" id="profile-approvals-divider"></div>
 
                 <!-- Account Type Toggle -->
                 <div class="profile-section">
@@ -490,14 +539,16 @@
             <button class="bottom-nav-tab" id="bottom-nav-profile">
                 <div id="bottom-nav-avatar" class="bottom-nav-avatar-wrap">
                     <img id="bottom-nav-photo" src="" alt="Profile">
+                    <span class="badge approvals-badge hidden">0</span>
                 </div>
                 <span>Profile</span>
             </button>
         </nav>
 
-        <!-- ============ TOAST CONTAINER ============ -->
-        <div id="toast-container"></div>
     </div>
+
+    <!-- ============ TOAST CONTAINER ============ -->
+    <div id="toast-container"></div>
 
     <!-- Bundled by Vite: Firebase (modular SDK) + app code. Messaging, Functions
          and the sign-in popup are split into chunks that load on demand. -->
