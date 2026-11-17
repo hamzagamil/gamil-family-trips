@@ -36,7 +36,7 @@ service cloud.firestore {
     // Fields only the Admin SDK (Cloud Functions / Console) may write
     function touchesProtectedFields() {
       return request.resource.data.diff(resource.data).affectedKeys()
-        .hasAny(['status', 'admin', 'decidedBy', 'decidedAt']);
+        .hasAny(['status', 'admin', 'decidedBy', 'decidedAt', 'adminsNotified']);
     }
 
     // Users collection — owner-only reads (user docs hold FCM tokens), plus
@@ -45,7 +45,7 @@ service cloud.firestore {
       allow read: if signedIn() && (request.auth.uid == userId || isAdmin());
       allow create: if signedIn() && request.auth.uid == userId
         && request.resource.data.status == 'pending'
-        && !request.resource.data.keys().hasAny(['admin', 'decidedBy', 'decidedAt']);
+        && !request.resource.data.keys().hasAny(['admin', 'decidedBy', 'decidedAt', 'adminsNotified']);
       allow update: if signedIn() && request.auth.uid == userId && !touchesProtectedFields();
       allow delete: if signedIn() && request.auth.uid == userId;
 

@@ -13,8 +13,10 @@
  * 3. deleteAccount (callable HTTPS):
  *    In-app account deletion (App Store 5.1.1(v) / Google Play requirement).
  *
- * 4. notifyAdminsOfJoinRequest (Firestore trigger, users/{uid} created):
- *    New accounts start with status "pending" — push every admin.
+ * 4. requestAccess (callable HTTPS):
+ *    A new (pending) account asks to join — push every admin, once.
+ *    A callable, not a Firestore trigger: the database is in me-central2,
+ *    where this project can't create Eventarc triggers.
  *
  * 5. setUserApproval (callable HTTPS, admins only):
  *    Approve or decline a pending account; pushes the user when approved.
@@ -22,7 +24,6 @@
 
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore, Timestamp, FieldValue } = require("firebase-admin/firestore");
 const { getAuth } = require("firebase-admin/auth");
@@ -613,19 +614,33 @@ exports.deleteAccount = onCall(
 // ─────────────────────────────────────────────
 
 /**
- * A new account was created (always with status "pending" — enforced by
- * firestore.rules). Push every admin so they can approve it.
+ * Called by the app once a new account's users/{uid} doc exists with status
+ * "pending" (enforced by firestore.rules). Pushes every admin, once per
+ * account (adminsNotified, which clients can't write).
  */
-exports.notifyAdminsOfJoinRequest = onDocumentCreated(
-    { document: "users/{uid}", region: "us-central1" },
-    async (event) => {
-        const user = event.data ? event.data.data() : null;
-        if (!user || user.status !== "pending") return;
+exports.requestAccess = onCall(
+    { region: "us-central1" },
+    async (request) => {
+        if (!request.auth) {
+            throw new HttpsError("unauthenticated", "Must be signed in.");
+        }
+        const uid = request.auth.uid;
+        const userRef = db.collection("users").doc(uid);
+
+        // Claim the notification in a transaction so parallel calls send it once
+        const user = await db.runTransaction(async (tx) => {
+            const snap = await tx.get(userRef);
+            const data = snap.data();
+            if (!data || data.status !== "pending" || data.adminsNotified === true) return null;
+            tx.update(userRef, { adminsNotified: true });
+            return data;
+        });
+        if (!user) return { ok: true, notified: false };
 
         const admins = await db.collection("users").where("admin", "==", true).get();
         if (admins.empty) {
-            console.warn("[joinRequest] No admins configured — nobody to approve", event.params.uid);
-            return;
+            console.warn("[requestAccess] No admins configured — nobody to approve", uid);
+            return { ok: true, notified: false };
         }
 
         const name = user.displayName || user.email || "Someone";
@@ -634,16 +649,17 @@ exports.notifyAdminsOfJoinRequest = onDocumentCreated(
             body: `${name} wants to join Gamil Family Trips. Open your profile to approve.`,
         };
 
-        console.log(`[joinRequest] ${event.params.uid} pending — notifying ${admins.size} admin(s)`);
+        console.log(`[requestAccess] ${uid} pending — notifying ${admins.size} admin(s)`);
         await Promise.allSettled(admins.docs.map((admin) => {
             const tokens = admin.data().fcmTokens || [];
             if (tokens.length === 0) return null;
             return sendPushToUserTokens(admin.id, tokens, notification, {
                 tripId: "",
                 type: "join_request",
-                tag: `join-request-${event.params.uid}`,
+                tag: `join-request-${uid}`,
             });
         }));
+        return { ok: true, notified: true };
     }
 );
 

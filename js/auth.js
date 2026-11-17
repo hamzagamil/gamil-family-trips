@@ -25,6 +25,8 @@ export const Auth = (() => {
     let appStarted = false;
     // The first-login role picker was already offered this session
     let rolePickerOffered = false;
+    // requestAccess (notify the admins) was already called this session
+    let accessRequested = false;
 
     // ---- DOM refs ----
     const authScreen = document.getElementById('auth-screen');
@@ -338,6 +340,7 @@ export const Auth = (() => {
             currentUser = null;
             appStarted = false;
             rolePickerOffered = false;
+            accessRequested = false;
             stopProfileListener();
             Approvals.setAdmin(false);
             clearSessionHint();
@@ -450,12 +453,29 @@ export const Auth = (() => {
         applyStatus(status);
         Approvals.setAdmin(admin && status === 'approved');
 
+        // New join request: let the admins know (the function sends it once)
+        if (data && status === 'pending' && !data.adminsNotified && !accessRequested) {
+            accessRequested = true;
+            requestAccess();
+        }
+
         if (status !== 'approved') return;
         if (role) {
             if (role !== prevRole) updateRoleUI(role);
         } else if (!rolePickerOffered) {
             rolePickerOffered = true;
             showRolePicker();
+        }
+    }
+
+    async function requestAccess() {
+        try {
+            const fns = await ensureFunctions();
+            if (!fns) throw new Error('Could not reach the server');
+            await fns.httpsCallable('requestAccess')();
+        } catch (err) {
+            accessRequested = false; // try again on the next profile update
+            console.warn('Could not notify admins:', err.message);
         }
     }
 
